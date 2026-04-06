@@ -1,139 +1,89 @@
-import random
+from genetic import genetic_algorithm
 
 
-def initialize_population(matrix, population_size, start_node):
-    population = []
-    nodes = []
-    for i in range(0, len(matrix)):
-        if i != start_node:
-            nodes.append(i)
-    
-    for _ in range(population_size):
-        individual = [start_node] + random.sample(nodes, len(nodes))
-        population.append(individual)
+def read_matrix(filepath: str) -> list[list[int]]:
+    """Читает матрицу смежности из файла."""
+
+    with open(filepath, "r") as f:
+        matrix = [list(map(int, line.split())) for line in f if line.strip()]
+
+    if not matrix:
+        raise ValueError("Файл пуст или не содержит данных")
+
+    size = len(matrix)
+    for i, row in enumerate(matrix):
+        if len(row) != size:
+            raise ValueError(f"Строка {i} содержит {len(row)} элементов, ожидалось {size}")
+
+    return matrix
+
+
+def input_int(prompt: str, min_val: int = None, max_val: int = None) -> int:
+    """Запрашивает целое число с валидацией диапазона."""
+
+    while True:
+        try:
+            value = int(input(prompt))
+            if min_val is not None and value < min_val:
+                print(f"Значение должно быть не меньше {min_val}")
+                continue
+
+            if max_val is not None and value > max_val:
+                print(f"Значение должно быть не больше {max_val}")
+                continue
+
+            return value
         
-    return population
+        except ValueError:
+            print("Введите целое число")
 
 
-def calculate_fitness(individual, matrix):
-    total_distance = 0
-    for i in range(len(individual) - 1):
-        total_distance += matrix[individual[i]][individual[i + 1]]
-    total_distance += matrix[individual[-1]][individual[0]]
-
-    return 1 / total_distance
-
-
-def select_parents(population, fitness):
-    total_fitness = sum(fitness)
-    probabilities = [f / total_fitness for f in fitness]
-    parents = random.choices(population, weights=probabilities, k=2)
+def input_float(prompt: str, min_val: float = 0.0, max_val: float = 1.0) -> float:
+    """Запрашивает дробное число с валидацией диапазона."""
     
-    return parents
+    while True:
+        try:
+            value = float(input(prompt))
+            if not (min_val <= value <= max_val):
+                print(f"Значение должно быть в диапазоне {min_val} — {max_val}")
+                continue
 
-
-def crossover(parent1, parent2):
-    size = len(parent1)
-    start, end = sorted(random.sample(range(1, size), 2))
-    
-    child1 = [None] * size
-    child2 = [None] * size
-    
-    child1[start:end] = parent1[start:end]
-    child2[start:end] = parent2[start:end]
-    
-    def fill_child(child, parent):
-        for i in range(size):
-            if child[i] is None:
-                for node in parent:
-                    if node not in child:
-                        child[i] = node
-                        break
+            return value
         
-        return child
-    
-    return fill_child(child1, parent2), fill_child(child2, parent1)
+        except ValueError:
+            print("Введите число")
 
-
-def mutate(individual, mutation_rate):
-    if random.random() < mutation_rate:
-        start, end = sorted(random.sample(range(1, len(individual)), 2))
-        individual[start:end] = reversed(individual[start:end])
-    
-    return individual
-
-
-def create_new_generation(population, matrix, mutation_rate):
-    fitness = [calculate_fitness(individual, matrix) for individual in population]
-    elite_size = int(0.1 * len(population))
-    
-    sorted_population = sorted(population, key=lambda ind: calculate_fitness(ind, matrix), reverse=True)
-    new_population = sorted_population[:elite_size]
-    
-    while len(new_population) < len(population):
-        parent1, parent2 = select_parents(population, fitness)
-        child1, child2 = crossover(parent1, parent2)
-        
-        child1 = mutate(child1, mutation_rate)
-        child2 = mutate(child2, mutation_rate)
-        
-        new_population.append(child1)
-        if len(new_population) < len(population):
-            new_population.append(child2)
-    
-    return new_population
-
-
-def genetic_algorithm(matrix, population_size, max_generations_without_improvement, mutation_rate, start_node):
-    population = initialize_population(matrix, population_size, start_node)
-    
-    best_distance = 10**6
-    best_solution = None
-    generations_without_improvement = 0
-    generations_score = 0
-    
-    while generations_without_improvement < max_generations_without_improvement:
-        population = create_new_generation(population, matrix, mutation_rate)
-        best_individual = max(population, key=lambda ind: calculate_fitness(ind, matrix))
-        best_individual_distance = 1 / calculate_fitness(best_individual, matrix)
-        
-        if best_individual_distance < best_distance:
-            best_distance = best_individual_distance
-            best_solution = best_individual
-            generations_without_improvement = 0
-        else:
-            generations_without_improvement += 1
-        generations_score += 1
-        
-    
-    return best_solution, best_distance, generations_score
-    
 
 def main():
-    print("Введите путь до файла с матрицей смежности.")
-    file = input().strip().replace('"', '')
-    f = open(file, 'r')
-    matrix = []
-    for line in f:
-        matrix.append(list(map(int, line.split())))
+    filepath = input("Путь до файла с матрицей смежности: ").strip().replace('"', '')
+    matrix = read_matrix(filepath)
+    n = len(matrix)
 
-    print("Введите количество популяций. Рекомендуется вести в диапазоне 50-200.")
-    population_size = int(input())
-    print("Введите условие остановки алгоритма. Число поколений без улучшений результата.")
-    max_generations_without_improvement = int(input())
-    print("Введите вероятность мутации.")
-    mutation_rate = float(input())
-    print(f"Введите начало маршрута (0-{len(matrix)}).")
-    start_node = int(input())
-    
+    print(f"Загружена матрица {n}x{n}\n")
 
-    solution, distance, generations_score = genetic_algorithm(matrix, population_size, max_generations_without_improvement, mutation_rate, start_node)
-    solution.append(solution[0])
-    print(f"Кратчайший маршрут:\n{', '.join(map(str, solution))}")
-    print(f"Длина кратчайшего маршрута:\n{round(distance, 2)}")
-    print(f"Количество поколений:\n{generations_score-max_generations_without_improvement}")
-    
+    population_size = input_int(
+        "Размер популяции (рекомендуется 50–200): ", min_val=2
+    )
+    max_no_improvement = input_int(
+        "Поколений без улучшений для остановки (рекомендуется 200–1000): ", min_val=1
+    )
+    mutation_rate = input_float(
+        "Вероятность мутации (рекомендуется 0.1–0.5): ", min_val=0.0, max_val=1.0
+    )
+    start_node = input_int(
+        f"Начальная вершина маршрута (0–{n - 1}): ", min_val=0, max_val=n - 1
+    )
+
+    solution, distance, generations = genetic_algorithm(
+        matrix, population_size, max_no_improvement, mutation_rate, start_node
+    )
+
+    route = solution + [solution[0]]
+
+    print(f"\nКратчайший маршрут: {' → '.join(map(str, route))}")
+    print(f"Длина маршрута: {round(distance, 2)}")
+    print(f"Поколений до сходимости: {generations}")
+
 
 if __name__ == "__main__":
     main()
-    
